@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SPA Comments System</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.4/css/lightbox.min.css" rel="stylesheet">
+    
+    <style>
+        {% include 'style.css' %}
+    </style>
+    
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body>
+    
+    {% verbatim %}
+    <div id="app" class="container mt-5 pb-5">
+        <div class="row justify-content-center">
+            <div class="col-lg-10"> <div id="commentForm" class="card shadow-sm mb-5 border-primary">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-3">
+                        <h5 class="mb-0 fs-6">{{ newComment.parent ? 'Ответ пользователю ' + replyToName : 'Написать комментарий' }}</h5>
+                        <button v-if="newComment.parent" @click="cancelReply" class="btn btn-sm btn-light py-0">Отмена</button>
+                    </div>
+                    <div class="card-body p-4">
+                        <form @submit.prevent="submitComment">
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <input v-model="newComment.username" type="text" class="form-control" placeholder="Имя (латиница/цифры)" required pattern="[a-zA-Z0-9]+">
+                                </div>
+                                <div class="col-md-4">
+                                    <input v-model="newComment.email" type="email" class="form-control" placeholder="Email" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <input v-model="newComment.homepage" type="url" class="form-control" placeholder="Home Page (URL)">
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <div class="btn-group mb-2" role="group">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" @click="insertTag('i')" title="Курсив">Курсив</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" @click="insertTag('strong')" title="Жирный">Жирный</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" @click="insertTag('code')" title="Код">Код</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" @click="insertTag('a')" title="Ссылка">Ссылка</button>
+                                </div>
+                                <textarea ref="commentText" v-model="newComment.text" class="form-control" rows="4" placeholder="Ваше сообщение..." required></textarea>
+                            </div>
+                            <div v-if="newComment.text" class="mb-4 p-3 bg-light border rounded shadow-sm">
+                                <label class="text-muted small fw-bold mb-2">👁 Предпросмотр:</label>
+                                <div class="text-break text-secondary" v-html="newComment.text"></div>
+                            </div>
+                            
+                            <div class="row mb-4 align-items-center">
+                                <div class="col-auto">
+                                    <img v-if="captcha.image" :src="captcha.image" class="captcha-img shadow-sm" @click="fetchCaptcha" title="Обновить капчу" alt="captcha">
+                                </div>
+                                <div class="col-md-4">
+                                    <input v-model="newComment.captcha_value" class="form-control" placeholder="Код с картинки" required>
+                                </div>
+                            </div>
+
+                            <div class="row mb-4 bg-light p-3 rounded mx-0">
+                                <div class="col-md-6">
+                                    <label class="form-label small text-muted mb-1">Изображение (до 320x240)</label>
+                                    <input type="file" ref="imageFile" class="form-control form-control-sm" accept="image/jpeg, image/png, image/gif">
+                                </div>
+                                <div class="col-md-6 mt-3 mt-md-0">
+                                    <label class="form-label small text-muted mb-1">Файл (.txt, до 100кб)</label>
+                                    <input type="file" ref="textFile" class="form-control form-control-sm" accept=".txt">
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary w-100 py-2" :disabled="loading">
+                                {{ loading ? 'Отправка...' : 'Опубликовать' }}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="bg-white shadow-sm rounded p-4">
+                    
+                    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-3 border-bottom">
+                        <h5 class="mb-0 text-secondary">Комментарии ({{ comments.length }})</h5>
+                        <div class="d-flex align-items-center gap-3 small mt-2 mt-md-0">
+                            <span class="text-muted">Сортировать:</span>
+                            <span @click="sort('username')" class="sort-header">по имени</span>
+                            <span @click="sort('email')" class="sort-header">по e-mail</span>
+                            <span @click="sort('created_at')" class="sort-header">по дате</span>
+                        </div>
+                    </div>
+
+                    <div class="comments-list">
+                        <template v-for="(comment, index) in comments" :key="comment.id">
+                            <div class="mb-4">
+                                
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div>
+                                        <strong class="text-primary fs-6">@{{ comment.username }}</strong>
+                                        <span class="text-muted small ms-2 d-none d-sm-inline">{{ comment.email }}</span>
+                                        <a v-if="comment.homepage" :href="comment.homepage" target="_blank" class="small ms-2 text-decoration-none" title="Домашняя страница">🌐 Сайт</a>
+                                    </div>
+                                    <span class="text-muted small text-end">{{ formatDate(comment.created_at) }}</span>
+                                </div>
+
+                                <div class="mb-2 text-break" v-html="comment.text"></div>
+
+                                <div class="d-flex align-items-center gap-3 mt-2">
+                                    <span @click="setReply(comment.id, comment.username)" class="reply-btn small fw-bold">Ответить</span>
+                                    
+                                    <a v-if="comment.image" :href="formatUrl(comment.image)" :data-lightbox="'gallery-' + comment.id">
+                                        <img :src="formatUrl(comment.image)" class="comment-img shadow-sm" style="max-height: 80px;" alt="Вложение">
+                                    </a>
+                                    <a v-if="comment.text_file" :href="formatUrl(comment.text_file)" target="_blank" class="btn btn-sm btn-outline-secondary py-0 px-2 small">📎 txt</a>
+                                </div>
+
+                                <div v-if="comment.replies && comment.replies.length > 0" class="mt-3">
+                                    <comment-node 
+                                        v-for="reply in comment.replies" 
+                                        :key="reply.id" 
+                                        :node="reply" 
+                                        @reply="setReply"
+                                    ></comment-node>
+                                </div>
+
+                            </div>
+                            
+                            <hr class="text-muted opacity-25" v-if="index !== comments.length - 1">
+                        </template>
+
+                        <div v-if="comments.length === 0" class="text-center text-muted py-4">
+                            Пока нет комментариев. Будьте первым!
+                            <div v-if="totalPages > 1" class="d-flex justify-content-center mt-4">
+                        <nav>
+                            <ul class="pagination pagination-sm shadow-sm">
+                                <li class="page-item" :class="{ disabled: currentPage === 1 }">
+                                    <button class="page-link text-primary" @click="fetchComments(currentPage - 1)">Назад</button>
+                                </li>
+                                <li class="page-item" v-for="p in totalPages" :key="p" :class="{ active: currentPage === p }">
+                                    <button class="page-link" :class="currentPage === p ? 'bg-primary border-primary text-white' : 'text-primary'" @click="fetchComments(p)">{{ p }}</button>
+                                </li>
+                                <li class="page-item" :class="{ disabled: currentPage === totalPages }">
+                                    <button class="page-link text-primary" @click="fetchComments(currentPage + 1)">Вперед</button>
+                                </li>
+                            </ul>
+                        </nav>
+                    </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    {% endverbatim %}
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.4/js/lightbox.min.js"></script>
+
+    {% verbatim %}
+    <script>
+        const CommentNode = {
+            name: 'CommentNode',
+            props: ['node'],
+            template: `
+                <div class="card reply-card border-0 shadow-sm recursive-reply border-start border-primary border-3 ps-3">
+                    <div class="card-body py-2 px-3">
+                        <div class="d-flex justify-content-between align-items-start small">
+                            <div>
+                                <strong>@{{ node.username }}</strong>
+                                <span class="text-muted ms-2 d-none d-sm-inline">{{ node.email }}</span>
+                            </div>
+                            <span class="text-muted text-end">{{ formatDate(node.created_at) }}</span>
+                        </div>
+                        <div class="text-secondary mt-1 text-break" v-html="node.text"></div>
+                        
+                        <div class="d-flex align-items-center gap-3 mt-2">
+                            <span @click="$emit('reply', node.id, node.username)" class="reply-btn small fw-bold">Ответить</span>
+                            <a v-if="node.image" :href="formatUrl(node.image)" :data-lightbox="'gallery-' + node.id">
+                                <img :src="formatUrl(node.image)" class="comment-img" style="max-height: 80px;" alt="Вложение">
+                            </a>
+                            <a v-if="node.text_file" :href="formatUrl(node.text_file)" target="_blank" class="btn btn-sm btn-outline-secondary py-0 px-2 small">📎 txt</a>
+                        </div>
+
+                        <div v-if="node.replies && node.replies.length > 0">
+                            <comment-node 
+                                v-for="child in node.replies" 
+                                :key="child.id" 
+                                :node="child" 
+                                @reply="(id, name) => $emit('reply', id, name)"
+                            ></comment-node>
+                        </div>
+                    </div>
+                </div>
+            `,
+            methods: {
+                formatDate(dateString) { 
+                    return new Date(dateString).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); 
+                },
+                formatUrl(url) { 
+                    if (!url) return null; 
+                    try { return new URL(url).pathname; } catch (e) { return url; } 
+                }
+            }
+        };
+
+        const app = Vue.createApp({
+            data() {
+                return {
+                    comments: [], loading: false, currentSort: '-created_at', replyToName: '',
+                    currentPage: 1, totalPages: 1, 
+                    captcha: { key: '', image: '' },
+                    newComment: { username: '', email: '', homepage: '', text: '', parent: null, captcha_key: '', captcha_value: '' }
+                }
+            },
+            methods: {
+                insertTag(tag) {
+                    const textarea = this.$refs.commentText;
+                    if (!textarea) return;
+                    
+                    const start = textarea.selectionStart;
+                    const end = textarea.selectionEnd;
+                    const text = this.newComment.text || '';
+                    let selected = text.substring(start, end);
+                    
+                    let openTag = `<${tag}>`;
+                    let closeTag = `</${tag}>`;
+                    
+                    if (tag === 'a') {
+                        const url = prompt('Введите URL ссылки:', 'https://');
+                        if (!url) return;
+                        
+                        const title = prompt('Введите описание (title) для ссылки:', 'Перейти по ссылке');
+                        
+                        if (!selected) {
+                            selected = prompt('Введите текст ссылки (то, что будет кликабельным):', 'Link');
+                            if (!selected) return;
+                        }
+                        
+                        openTag = `<a href="${url}" title="${title || ''}">`;
+                    }
+                    
+                    const before = text.substring(0, start);
+                    const after = text.substring(end);
+                    
+                    this.newComment.text = before + openTag + selected + closeTag + after;
+                    
+                    this.$nextTick(() => {
+                        textarea.focus();
+                        const newPos = before.length + openTag.length + selected.length + closeTag.length;
+                        textarea.setSelectionRange(newPos, newPos);
+                    });
+                },
+                formatUrl(url) { 
+                    if (!url) return null; 
+                    try { return new URL(url).pathname; } catch (e) { return url; } 
+                },
+                async fetchComments(page = 1) {
+                    try {
+                        const response = await axios.get(`/api/comments/?ordering=${this.currentSort}&page=${page}`);
+                        if (response.data.results !== undefined) {
+                            this.comments = response.data.results;
+                            this.totalPages = Math.ceil(response.data.count / 25);
+                            this.currentPage = page;
+                        } else {
+                            this.comments = response.data;
+                        }
+                    } catch (error) { console.error('Error fetching comments:', error); }
+                },
+                async fetchCaptcha() {
+                    try {
+                        const res = await axios.post('/api/captcha/');
+                        this.captcha.image = `data:image/png;base64,${res.data.captcha_image}`;
+                        this.newComment.captcha_key = res.data.captcha_key;
+                    } catch (e) { console.error('Captcha error:', e); }
+                },
+                sort(field) {
+                    this.currentSort = this.currentSort === field ? `-${field}` : field;
+                    this.fetchComments();
+                },
+                setReply(parentId, username) {
+                    this.newComment.parent = parentId;
+                    this.replyToName = username;
+                    this.newComment.text = `@${username}, `;
+                    document.getElementById('commentForm').scrollIntoView({ behavior: 'smooth' });
+                },
+                cancelReply() { 
+                    this.newComment.parent = null; 
+                    this.newComment.text = ''; 
+                },
+                async submitComment() {
+                    this.loading = true;
+                    const formData = new FormData();
+                    Object.keys(this.newComment).forEach(key => { 
+                        if (this.newComment[key] !== null && this.newComment[key] !== '') {
+                            formData.append(key, this.newComment[key]); 
+                        }
+                    });
+                    if (this.$refs.imageFile.files[0]) formData.append('image', this.$refs.imageFile.files[0]);
+                    if (this.$refs.textFile.files[0]) formData.append('text_file', this.$refs.textFile.files[0]);
+
+                    try {
+                        await axios.post('/api/comments/', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+                        this.newComment.text = ''; this.newComment.captcha_value = ''; this.newComment.parent = null; this.newComment.homepage = '';
+                        this.$refs.imageFile.value = ''; this.$refs.textFile.value = '';
+                        await this.fetchCaptcha(); await this.fetchComments();
+                    } catch (e) {
+                        alert("Ошибка! Проверьте поля и капчу."); this.fetchCaptcha();
+                    } finally { this.loading = false; }
+                },
+                formatDate(dateString) { 
+                    return new Date(dateString).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); 
+                },
+                connectWS() {
+                    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+                    const socket = new WebSocket(`${protocol}://${window.location.host}/ws/comments/`);
+                    socket.onmessage = (event) => {
+                        const data = JSON.parse(event.data);
+                        if (!data.parent) { this.comments.unshift(data); } else { this.fetchComments(); }
+                    };
+                    socket.onclose = () => { setTimeout(() => this.connectWS(), 5000); };
+                }
+            },
+            mounted() { this.fetchComments(); this.fetchCaptcha(); this.connectWS(); }
+        });
+
+        app.component('comment-node', CommentNode);
+        app.mount('#app');
+    </script>
+    {% endverbatim %}
+</body>
+</html>

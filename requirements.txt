@@ -1,0 +1,14 @@
+Django>=4.2,<5.0
+djangorestframework
+psycopg2-binary
+Pillow==9.5.0
+bleach
+django-cors-headers
+PyMySQL==1.1.0
+cryptography==42.0.5
+django-redis==5.4.0
+celery==5.3.6
+django-rest-captcha
+daphne==4.0.0
+channels==4.0.0
+channels-redis==4.1.0

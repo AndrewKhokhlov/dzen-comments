@@ -1,0 +1,43 @@
+/* ФОН И БАЗА */
+body { background-color: #f7f5f0 !important; } 
+.reply-card { background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(107,90,82, 0.05) !important; }
+
+/* ЦВЕТА */
+.bg-primary { background-color: #6b5a52 !important; } 
+.border-primary { border-color: #6b5a52 !important; }
+.text-primary { color: #6b5a52 !important; }
+.btn-primary { background-color: #6b5a52 !important; border-color: #6b5a52 !important; }
+.btn-primary:hover { background-color: #4f413a !important; border-color: #4f413a !important; }
+
+/* ИНТЕРАКТИВНЫЕ ЭЛЕМЕНТЫ */
+.reply-btn { cursor: pointer; color: #6b5a52; text-decoration: none; font-weight: 500; font-size: 0.9em; transition: 0.2s ease-in-out; }
+.reply-btn:hover { color: #4f413a; text-decoration: underline; }
+.sort-header { cursor: pointer; color: #6b5a52; text-decoration: none; font-weight: 600; transition: 0.2s; }
+.sort-header:hover { color: #4f413a; }
+
+/* ТАБЛИЦА И ЛЕСЕНКА ОТВЕТОВ */
+.recursive-reply { margin-left: 3rem; margin-top: 0.5rem; }
+.no-border-bottom td { border-bottom: none !important; }
+
+/* КАРТИНКИ И КАПЧА */
+.comment-img { max-width: 200px; max-height: 150px; border-radius: 6px; border: 1px solid #e5e7eb; object-fit: cover; cursor: zoom-in; transition: transform 0.2s, opacity 0.2s; }
+.comment-img:hover { opacity: 0.85; transform: scale(1.03); }
+.captcha-img { cursor: pointer; border: 1px solid #e5e7eb; border-radius: 6px; max-height: 50px; transition: opacity 0.2s; }
+.captcha-img:hover { opacity: 0.7; }
+
+/* ДЛЯ LIGHTBOX */
+#lightbox { transform: scale(1.8); transform-origin: center top; margin-top: 10vh; }
+
+/* ДЛЯ МОБИЛОК */
+@media (max-width: 768px) {
+    .recursive-reply { margin-left: 0.8rem !important; }
+}
+
+
+/* Делаем ссылки жирными и цветными */
+.text-secondary a, .text-break a, .comments-list a {
+    color: #6b5a52 !important;
+    text-decoration: underline !important;
+    font-weight: bold !important;
+    cursor: pointer;
+}
